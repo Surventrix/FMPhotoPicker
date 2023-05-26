@@ -119,7 +119,7 @@ class Helper: NSObject {
         return pId
     }
     
-    static func getPhoto(by photoAsset: PHAsset, in desireSize: CGSize, complete: @escaping (UIImage?) -> Void) -> PHImageRequestID {    
+    static func getPhoto(by photoAsset: PHAsset, in desireSize: CGSize, complete: @escaping (UIImage?) -> Void) -> PHImageRequestID {
         let options = PHImageRequestOptions()
         options.deliveryMode = .highQualityFormat
         options.resizeMode = .fast
@@ -139,10 +139,11 @@ class Helper: NSObject {
     
     static func getAssets(allowMediaTypes: [FMMediaType]) -> [PHAsset] {
         let fetchOptions = PHFetchOptions()
-        fetchOptions.includeAssetSourceTypes = [.typeUserLibrary, .typeCloudShared, .typeiTunesSynced]
+//        fetchOptions.includeAssetSourceTypes = [.typeUserLibrary, .typeCloudShared, .typeiTunesSynced]
+        fetchOptions.includeAssetSourceTypes = [.typeUserLibrary]
         
         // Default sort is modificationDate
-        // fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: true)]
+         fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: true)]
         
         fetchOptions.predicate = NSPredicate(format: "mediaType IN %@", allowMediaTypes.map( { $0.value() }))
         
