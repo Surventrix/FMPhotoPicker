@@ -90,10 +90,6 @@ class FMPhotoPickerBatchSelector: NSObject {
         else {
             stopTimer()
         }
-        
-        print("offset.y \(offset.y)")
-        print("contentHeight \(contentHeight)")
-        
     }
     
     
@@ -120,23 +116,20 @@ class FMPhotoPickerBatchSelector: NSObject {
             }
         } else if sender.state == .ended {
             stopTimer()
-            print("ended")
             self.indexPathOfBeganTap = nil
             self.prevIndexPath = nil
             self.panSelections.removeAll()
         } else {
-            print("else")
-
             self.processPanEvent(pan: sender)
         }
     }
     
     private func processPanEvent(pan: UIPanGestureRecognizer) {
         guard let indexPathOfBeganTap  = self.indexPathOfBeganTap,
-            let currentIndexPath = self.cellIndexPathForPan(pan: pan),
-            let prevIndexPath = self.prevIndexPath,
-            prevIndexPath != currentIndexPath
-            else { return }
+              let currentIndexPath = self.cellIndexPathForPan(pan: pan),
+              let prevIndexPath = self.prevIndexPath,
+              prevIndexPath != currentIndexPath
+        else { return }
         
         var panSelectionsTobeChanged = [PanSelection]()
         var panSelectionsTobeReset = [PanSelection]()
@@ -180,24 +173,45 @@ class FMPhotoPickerBatchSelector: NSObject {
         self.viewController.reloadAffectedCellByChangingSelection(changedIndex: 0)
         
         self.viewController.updateControlBar()
-                
+        var thresholdPoint =  self.viewController.view.frame.size.height * 0.15
+        thresholdPoint =  max(thresholdPoint, 100)
         let pointY = pan.location(in: self.collectionView).y
-        let height = self.collectionView.frame.size.height - 300
+        let topY = pan.location(in: self.viewController.view).y
+        let height = self.collectionView.frame.size.height - thresholdPoint
         
         offsetYValue = pointY > prevPointY ? 50 : -50
-        
+        stopTimer()
+
+        print("")
+        print("thresholdPoint \(thresholdPoint)")
         print("pointY \(pointY)")
+        print("topY \(topY)")
         print("height \(height)")
-        
-        if pointY >= height && timer == nil {
-            startTimer()
+
+        if offsetYValue < 0 {
+            
+            var statsBarHeight:CGFloat = 20
+            
+            if #available(iOS 11.0, *) {
+                statsBarHeight = self.viewController.view.safeAreaInsets.top
+            }
+            
+            let topSpace = CGFloat(self.collectionView.frame.origin.y + statsBarHeight)
+            
+            if ((topY - topSpace) < thresholdPoint) {
+                print("start")
+                startTimer()
+            }
+        }
+        else if (topY > height) {
+               print("start")
+               startTimer()
         }
         
         prevPointY = pointY
 
         self.prevIndexPath = currentIndexPath
     }
-    
     
     /**
      Change selection status of all Photo in dataSource that are listed in panSelections by SelectionTrending
