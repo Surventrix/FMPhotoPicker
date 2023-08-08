@@ -12,7 +12,7 @@ import UIKit
 enum SelectionTrending {
     case set
     case unset
-    
+
     func reverse() -> SelectionTrending {
         if self == .set {
             return .unset
@@ -24,7 +24,7 @@ enum SelectionTrending {
 struct PanSelection {
     // The index path of the cell that was panned over
     var indexPath: IndexPath
-    
+
     // The selection state before changed
     var originalSelection: Bool
 }
@@ -33,55 +33,55 @@ class FMPhotoPickerBatchSelector: NSObject {
     private unowned let viewController: FMPhotoPickerViewController
     private let collectionView: UICollectionView
     private let dataSource: FMPhotosDataSource
-    
+
     // an index path of cell that be tapped by pan began event
     private var indexPathOfBeganTap: IndexPath?
-    
+
     // an index pathh of previous cell when user's finger move to an other cell
     private var prevIndexPath: IndexPath?
-    
+
     // reverse of the first tapped cell selection status
     private var selectionTrending: SelectionTrending = .set
-    
+
     // the list of affected cell index path
     private var panSelections = [PanSelection]()
-    
+
     private lazy var panGesture: UIPanGestureRecognizer = {
         let pan = UIPanGestureRecognizer(target: self, action: #selector(panGestureHandler(sender:)))
         return pan
     }()
-    
+
     init(viewController: FMPhotoPickerViewController, collectionView: UICollectionView, dataSource: FMPhotosDataSource) {
         self.viewController = viewController
         self.collectionView = collectionView
         self.dataSource = dataSource
         super.init()
     }
-    
+
     public func enable() {
         self.viewController.view.addGestureRecognizer(self.panGesture)
     }
-    
+
     var timer: Timer?
     var prevPointY: Double = 0
     var offsetYValue: Double = 0
-    
+
     func startTimer()  {
         stopTimer()
         timer = Timer.scheduledTimer(timeInterval: 0.13, target: self, selector: #selector(autoScrollCollectionView), userInfo: nil, repeats: true)
     }
-    
+
     func stopTimer()  {
         timer?.invalidate()
         timer = nil
     }
-    
+
     @objc func autoScrollCollectionView() {
-        
+
         let contentHeight = self.collectionView.contentSize.height - (self.collectionView.frame.size.height - 50)
-        
+
         var offset = self.collectionView.contentOffset
-        
+
         offset.y += offsetYValue
         if offset.y < contentHeight && offset.y > 0 {
             self.collectionView.setContentOffset(offset, animated: false)
@@ -91,18 +91,18 @@ class FMPhotoPickerBatchSelector: NSObject {
             stopTimer()
         }
     }
-    
-    
+
+
     @objc private func panGestureHandler(sender: UIPanGestureRecognizer) {
         panGesture = sender
         if sender.state == .began {
             print("began")
             self.indexPathOfBeganTap = self.cellIndexPathForPan(pan: sender)
             self.prevIndexPath = indexPathOfBeganTap
-            
+
             if let cellIndexPathOfBeganTap = self.indexPathOfBeganTap {
                 let selectedIndex = self.dataSource.selectedIndexOfPhoto(atIndex: cellIndexPathOfBeganTap.item)
-                
+
                 if let selectedIndex = selectedIndex {
                     self.selectionTrending = .unset
                     self.dataSource.unsetSeclectedForPhoto(atIndex: cellIndexPathOfBeganTap.item)
@@ -123,17 +123,17 @@ class FMPhotoPickerBatchSelector: NSObject {
             self.processPanEvent(pan: sender)
         }
     }
-    
+
     private func processPanEvent(pan: UIPanGestureRecognizer) {
         guard let indexPathOfBeganTap  = self.indexPathOfBeganTap,
               let currentIndexPath = self.cellIndexPathForPan(pan: pan),
               let prevIndexPath = self.prevIndexPath,
               prevIndexPath != currentIndexPath
         else { return }
-        
+
         var panSelectionsTobeChanged = [PanSelection]()
         var panSelectionsTobeReset = [PanSelection]()
-        
+
         if currentIndexPath.item >= indexPathOfBeganTap.item {
             if currentIndexPath.item > prevIndexPath.item {
                 if prevIndexPath.item > indexPathOfBeganTap.item {
@@ -157,28 +157,28 @@ class FMPhotoPickerBatchSelector: NSObject {
                 panSelectionsTobeReset = self.getPanSelectionsTobeResetFromPrevSection(fromIndex: prevIndexPath.item, toIndex: currentIndexPath.item - 1)
             }
         }
-        
+
         self.resetSelectionState(of: panSelectionsTobeReset)
         self.reloadCells(in: panSelectionsTobeReset)
         self.removeFromPrevSection(panSelectionsTobeReset: panSelectionsTobeReset)
-        
-        
+
+
         self.changeSelectionState(of: panSelectionsTobeChanged, by: self.selectionTrending)
         self.reloadCells(in: panSelectionsTobeChanged)
         self.panSelections.append(contentsOf: panSelectionsTobeChanged)
-        
+
         // Reload all selected photocells
         // In fact, we do NOT need to reload all selected photocells
         // But in most cases, the cost to find all the affected cells by current changing selection is higher than the cost to refresh all
         self.viewController.reloadAffectedCellByChangingSelection(changedIndex: 0)
-        
+
         self.viewController.updateControlBar()
         var thresholdPoint =  self.viewController.view.frame.size.height * 0.15
         thresholdPoint =  max(thresholdPoint, 100)
         let pointY = pan.location(in: self.collectionView).y
         let topY = pan.location(in: self.viewController.view).y
         let height = self.collectionView.frame.size.height - thresholdPoint
-        
+
         offsetYValue = pointY > prevPointY ? 50 : -50
         stopTimer()
 
@@ -189,15 +189,15 @@ class FMPhotoPickerBatchSelector: NSObject {
         print("height \(height)")
 
         if offsetYValue < 0 {
-            
+
             var statsBarHeight:CGFloat = 20
-            
+
             if #available(iOS 11.0, *) {
                 statsBarHeight = self.viewController.view.safeAreaInsets.top
             }
-            
+
             let topSpace = CGFloat(self.collectionView.frame.origin.y + statsBarHeight)
-            
+
             if ((topY - topSpace) < thresholdPoint) {
                 print("start")
                 startTimer()
@@ -207,12 +207,12 @@ class FMPhotoPickerBatchSelector: NSObject {
                print("start")
                startTimer()
         }
-        
+
         prevPointY = pointY
 
         self.prevIndexPath = currentIndexPath
     }
-    
+
     /**
      Change selection status of all Photo in dataSource that are listed in panSelections by SelectionTrending
      */
@@ -225,7 +225,7 @@ class FMPhotoPickerBatchSelector: NSObject {
             }
         }
     }
-    
+
     private func resetSelectionState(of panSelections: [PanSelection]) {
         panSelections.forEach { panSelection in
             if panSelection.originalSelection {
@@ -235,7 +235,7 @@ class FMPhotoPickerBatchSelector: NSObject {
             }
         }
     }
-    
+
     /**
      Reload all affected cells
      */
@@ -244,13 +244,13 @@ class FMPhotoPickerBatchSelector: NSObject {
         panSelections.forEach { indexPaths.append($0.indexPath) }
         self.collectionView.reloadItems(at: indexPaths)
     }
-    
+
     /**
      Return PanSelections that need to be reset
      */
     private func getPanSelectionsTobeResetFromPrevSection(fromIndex: Int, toIndex: Int) -> [PanSelection] {
         if toIndex < fromIndex { return [] }
-        
+
         var result = [PanSelection]()
         for index in fromIndex...toIndex {
             let found = self.panSelections.firstIndex(where: { $0.indexPath.item == index })
@@ -260,7 +260,7 @@ class FMPhotoPickerBatchSelector: NSObject {
         }
         return result
     }
-    
+
     /**
      Remove all element of PanSelections from previous affected cells
      */
@@ -271,14 +271,14 @@ class FMPhotoPickerBatchSelector: NSObject {
             }
         }
     }
-    
-    
+
+
     /**
      Create a new affected index path range
      */
     private func createPanSelectionRange(fromIndex: Int, toIndex: Int) -> [PanSelection] {
         if toIndex < fromIndex { return [] }
-        
+
         var result = [PanSelection]()
         for index in fromIndex...toIndex {
             let indexPath = IndexPath(row: index, section: 0)
@@ -287,7 +287,7 @@ class FMPhotoPickerBatchSelector: NSObject {
         }
         return result
     }
-    
+
     private func cellIndexPathForPan(pan: UIPanGestureRecognizer) -> IndexPath? {
         return self.collectionView.indexPathForItem(at: pan.location(in: self.collectionView))
     }
