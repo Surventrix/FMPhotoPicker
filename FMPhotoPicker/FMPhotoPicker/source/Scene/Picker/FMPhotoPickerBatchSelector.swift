@@ -173,11 +173,12 @@ class FMPhotoPickerBatchSelector: NSObject {
         self.viewController.reloadAffectedCellByChangingSelection(changedIndex: 0)
 
         self.viewController.updateControlBar()
-        var thresholdPoint =  self.viewController.view.frame.size.height * 0.15
+        var thresholdPoint =  self.viewController.view.frame.size.height * 0.1
         thresholdPoint =  max(thresholdPoint, 100)
         let pointY = pan.location(in: self.collectionView).y
         let topY = pan.location(in: self.viewController.view).y
-        let height = self.collectionView.frame.size.height - thresholdPoint
+        let safeAreaInsets = self.viewController.view.safeAreaInsets
+        let height = self.collectionView.frame.size.height - (thresholdPoint + safeAreaInsets.top + safeAreaInsets.bottom)
 
         offsetYValue = pointY > prevPointY ? 50 : -50
         stopTimer()
@@ -187,24 +188,19 @@ class FMPhotoPickerBatchSelector: NSObject {
         print("pointY \(pointY)")
         print("topY \(topY)")
         print("height \(height)")
+        print("offsetYValue \(offsetYValue)")
 
         if offsetYValue < 0 {
 
-            var statsBarHeight:CGFloat = 20
+            let topSpace = self.collectionView.frame.origin.y + thresholdPoint + safeAreaInsets.top
 
-            if #available(iOS 11.0, *) {
-                statsBarHeight = self.viewController.view.safeAreaInsets.top
-            }
-
-            let topSpace = CGFloat(self.collectionView.frame.origin.y + statsBarHeight)
-
-            if ((topY - topSpace) < thresholdPoint) {
-                print("start")
+            if (topY < topSpace) {
+                print("start up")
                 startTimer()
             }
         }
         else if (topY > height) {
-               print("start")
+               print("start down")
                startTimer()
         }
 
