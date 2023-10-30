@@ -27,24 +27,24 @@ public class FMPhotoPickerViewController: UIViewController {
     private weak var numberOfSelectedPhoto: UILabel!
     private weak var doneButton: UIButton!
     private weak var cancelButton: UIButton!
-    
+
     // MARK: - Public
     public weak var delegate: FMPhotoPickerViewControllerDelegate? = nil
-    
+
     // MARK: - Private
-    
+
     // Index of photo that is currently displayed in PhotoPresenterViewController.
     // Track this to calculate the destination frame for dismissal animation
     // from PhotoPresenterViewController to this ViewController
     private var presentedPhotoIndex: Int?
 
     private let config: FMPhotoPickerConfig
-    
+
     // The controller for multiple select/deselect
     private lazy var batchSelector: FMPhotoPickerBatchSelector = {
         return FMPhotoPickerBatchSelector(viewController: self, collectionView: self.imageCollectionView, dataSource: self.dataSource)
     }()
-    
+
     private var dataSource: FMPhotosDataSource! {
         didSet {
             if self.config.selectMode == .multiple {
@@ -53,56 +53,63 @@ public class FMPhotoPickerViewController: UIViewController {
             }
         }
     }
-    
+
+    fileprivate var prevIndexPathAtCenter: IndexPath?
+
+    fileprivate var currentIndexPath: IndexPath? {
+        let center = view.convert(imageCollectionView.center, to: imageCollectionView)
+        return imageCollectionView.indexPathForItem(at: center)
+    }
+
     // MARK: - Init
     public init(config: FMPhotoPickerConfig) {
         self.config = config
         super.init(nibName: nil, bundle: nil)
         modalPresentationStyle = .fullScreen
     }
-    
+
     required public init?(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
-    
+
     override public func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         if self.dataSource == nil {
             self.requestAndFetchAssets()
         }
     }
-    
+
     public override func loadView() {
         view = UIView()
         view.backgroundColor = .white
         initializeViews()
         setupView()
     }
-    
+
     // MARK: - Setup View
     private func setupView() {
         self.imageCollectionView.register(FMPhotoPickerImageCollectionViewCell.self, forCellWithReuseIdentifier: FMPhotoPickerImageCollectionViewCell.reuseId)
         self.imageCollectionView.dataSource = self
         self.imageCollectionView.delegate = self
-        
+
         self.numberOfSelectedPhotoContainer.isHidden = true
         self.doneButton.isHidden = true
-        
+
         // set button title
         self.cancelButton.setTitle(config.strings["picker_button_cancel"], for: .normal)
         self.cancelButton.titleLabel!.font = UIFont.boldSystemFont(ofSize: config.titleFontSize)
         self.doneButton.setTitle(config.strings["picker_button_select_done"], for: .normal)
         self.doneButton.titleLabel!.font = UIFont.boldSystemFont(ofSize: config.titleFontSize)
     }
-    
+
     @objc private func onTapCancel(_ sender: Any) {
         self.dismiss(animated: true)
     }
-    
+
     @objc private func onTapDone(_ sender: Any) {
         processDetermination()
     }
-    
+
     // MARK: - Logic
     private func requestAndFetchAssets() {
         if Helper.canAccessPhotoLib() {
@@ -128,7 +135,7 @@ public class FMPhotoPickerViewController: UIViewController {
                 )
         }
     }
-    
+
     private func fetchPhotos() {
         let photoAssets = Helper.getAssets(allowMediaTypes: self.config.mediaTypes)
         var forceCropType: FMCroppable? = nil
@@ -137,7 +144,7 @@ public class FMPhotoPickerViewController: UIViewController {
         }
         let fmPhotoAssets = photoAssets.map { FMPhotoAsset(asset: $0, forceCropType: forceCropType) }
         self.dataSource = FMPhotosDataSource(photoAssets: fmPhotoAssets)
-        
+
         if self.dataSource.numberOfPhotos > 0 {
             self.imageCollectionView.reloadData()
             self.imageCollectionView.selectItem(at: IndexPath(row: self.dataSource.numberOfPhotos - 1, section: 0),
@@ -145,7 +152,7 @@ public class FMPhotoPickerViewController: UIViewController {
                                                 scrollPosition: .bottom)
         }
     }
-    
+
     public func updateControlBar() {
         if self.dataSource.numberOfSelectedPhoto() > 0 {
             self.doneButton.isHidden = false
@@ -158,7 +165,7 @@ public class FMPhotoPickerViewController: UIViewController {
             self.numberOfSelectedPhotoContainer.isHidden = true
         }
     }
-    
+
     private func processDetermination() {
         if config.shouldReturnAsset {
             let assets = dataSource.getSelectedPhotos().compactMap { $0.asset }
@@ -167,9 +174,9 @@ public class FMPhotoPickerViewController: UIViewController {
         }
 
         FMLoadingView.shared.show()
-        
+
         var dict = [Int:UIImage]()
-        
+
         DispatchQueue.global(qos: .userInitiated).async {
             let multiTask = DispatchGroup()
             for (index, element) in self.dataSource.getSelectedPhotos().enumerated() {
@@ -181,7 +188,7 @@ public class FMPhotoPickerViewController: UIViewController {
                 }
             }
             multiTask.wait()
-            
+
             let result = dict.sorted(by: { $0.key < $1.key }).map { $0.value }
             DispatchQueue.main.async {
                 FMLoadingView.shared.hide()
@@ -199,13 +206,13 @@ extension FMPhotoPickerViewController: UICollectionViewDataSource {
         }
         return 0
     }
-    
+
     public func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: FMPhotoPickerImageCollectionViewCell.reuseId, for: indexPath) as? FMPhotoPickerImageCollectionViewCell,
             let photoAsset = self.dataSource.photo(atIndex: indexPath.item) else {
             return UICollectionViewCell()
         }
-        
+
         cell.loadView(photoAsset: photoAsset,
                       selectMode: self.config.selectMode,
                       selectedIndex: self.dataSource.selectedIndexOfPhoto(atIndex: indexPath.item))
@@ -219,10 +226,14 @@ extension FMPhotoPickerViewController: UICollectionViewDataSource {
             }
             self.updateControlBar()
         }
-        
+
         return cell
     }
-    
+
+    public func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
+        (cell as? FMPhotoPickerImageCollectionViewCell)?.updateImage()
+    }
+
     /**
      Reload all photocells that behind the deselected photocell
      - parameters:
@@ -233,7 +244,7 @@ extension FMPhotoPickerViewController: UICollectionViewDataSource {
         let indexPaths = affectedList.map { return IndexPath(row: $0, section: 0) }
         self.imageCollectionView.reloadItems(at: indexPaths)
     }
-    
+
     /**
      Try to insert the photo at specify index to selectd list.
      In Single selection mode, it will remove all the previous selection and add new photo to the selected list.
@@ -245,7 +256,7 @@ extension FMPhotoPickerViewController: UICollectionViewDataSource {
             guard let fmMediaType = self.dataSource.mediaTypeForPhoto(atIndex: index) else { return }
 
             var canBeAdded = true
-            
+
             switch fmMediaType {
             case .image:
                 if self.dataSource.countSelectedPhoto(byType: .image) >= self.config.maxImage {
@@ -264,7 +275,7 @@ extension FMPhotoPickerViewController: UICollectionViewDataSource {
             case .unsupported:
                 break
             }
-            
+
             if canBeAdded {
                 self.dataSource.setSeletedForPhoto(atIndex: index)
                 self.imageCollectionView.reloadItems(at: [IndexPath(row: index, section: 0)])
@@ -277,34 +288,64 @@ extension FMPhotoPickerViewController: UICollectionViewDataSource {
                 indexPaths.append(IndexPath(row: photoIndex, section: 0))
                 self.dataSource.unsetSeclectedForPhoto(atIndex: photoIndex)
             }
-            
+
             self.dataSource.setSeletedForPhoto(atIndex: index)
             indexPaths.append(IndexPath(row: index, section: 0))
             self.imageCollectionView.reloadItems(at: indexPaths)
             self.updateControlBar()
         }
     }
-    
+
     public override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
-        self.imageCollectionView.collectionViewLayout.invalidateLayout()
-        DispatchQueue.main.async {
-            self.imageCollectionView.reloadData()
+        if (coordinator.transitionDuration > 0) || (size.width != self.view.frame.size.width && size.height != self.view.frame.size.height) {
+            if prevIndexPathAtCenter == nil {
+                prevIndexPathAtCenter = currentIndexPath
+            }
+            self.imageCollectionView.collectionViewLayout.invalidateLayout()
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            self.imageCollectionView.reloadData()
+    }
+
+    public func collectionView(_ collectionView: UICollectionView, targetContentOffsetForProposedContentOffset proposedContentOffset: CGPoint) -> CGPoint {
+
+        guard var oldCenter = prevIndexPathAtCenter else {
+            return proposedContentOffset
         }
+
+        let indexs = collectionView.indexPathsForVisibleItems.compactMap{$0.item}
+        var diff = ((indexs.max() ?? 0) - (indexs.min() ?? 0)) / 3
+        diff = diff > 0 ? diff : 0
+        oldCenter = IndexPath(item: oldCenter.item - diff, section: 0)
+
+        let attrs =  collectionView.layoutAttributesForItem(at: oldCenter)
+        let newOriginForOldIndex = attrs?.frame.origin ?? proposedContentOffset
+
+        return newOriginForOldIndex
     }
 }
 
+extension FMPhotoPickerViewController: UIScrollViewDelegate {
+
+    public func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+
+        if scrollView == imageCollectionView {
+            if let prevIndexPathAtCenter = self.prevIndexPathAtCenter,
+               let currentIndexPath = self.currentIndexPath,
+               prevIndexPathAtCenter != currentIndexPath {
+                self.prevIndexPathAtCenter = nil
+            }
+        }
+    }
+
+}
 extension FMPhotoPickerViewController: UICollectionViewDelegateFlowLayout {
-    
+
     public func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
-        
+
         if let layout = collectionViewLayout as? FMPhotoPickerImageCollectionViewLayout {
             let itemSizeW = (collectionView.frame.size.width - ((layout.numberOfColumns - 1) * layout.padding)) / layout.numberOfColumns
             return CGSize(width: itemSizeW, height: itemSizeW)
         }
-        
+
         let itemSizeW = (collectionView.frame.size.width - ((5 - 1) * 1)) / 5
         return CGSize(width: itemSizeW, height: itemSizeW)
     }
@@ -326,14 +367,14 @@ extension FMPhotoPickerViewController: UIViewControllerTransitioningDelegate {
         animationController.getOriginFrame = self.getOriginFrameForTransition
         return animationController
     }
-    
+
     public func animationController(forDismissed dismissed: UIViewController) -> UIViewControllerAnimatedTransitioning? {
         guard let photoPresenterViewController = dismissed as? FMPhotoPresenterViewController else { return nil }
         let animationController = FMZoomOutAnimationController(interactionController: photoPresenterViewController.swipeInteractionController)
         animationController.getDestFrame = self.getOriginFrameForTransition
         return animationController
     }
-    
+
     open func interactionControllerForDismissal(using animator: UIViewControllerAnimatedTransitioning) -> UIViewControllerInteractiveTransitioning? {
         guard let animator = animator as? FMZoomOutAnimationController,
             let interactionController = animator.interactionController,
@@ -341,11 +382,11 @@ extension FMPhotoPickerViewController: UIViewControllerTransitioningDelegate {
             else {
                 return nil
         }
-        
+
         interactionController.animator = animator
         return interactionController
     }
-    
+
     func getOriginFrameForTransition() -> CGRect {
         guard let presentedPhotoIndex = self.presentedPhotoIndex,
             let cell = self.imageCollectionView.cellForItem(at: IndexPath(row: presentedPhotoIndex, section: 0))
@@ -360,7 +401,7 @@ private extension FMPhotoPickerViewController {
     func initializeViews() {
         let headerView = UIView()
         headerView.backgroundColor = .white
-        
+
         headerView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(headerView)
         NSLayoutConstraint.activate([
@@ -368,10 +409,10 @@ private extension FMPhotoPickerViewController {
             headerView.leftAnchor.constraint(equalTo: view.leftAnchor),
             headerView.rightAnchor.constraint(equalTo: view.rightAnchor),
         ])
-        
+
         let headerSeparator = UIView()
         headerSeparator.backgroundColor = kBorderColor
-        
+
         headerSeparator.translatesAutoresizingMaskIntoConstraints = false
         headerView.addSubview(headerSeparator)
         NSLayoutConstraint.activate([
@@ -380,9 +421,9 @@ private extension FMPhotoPickerViewController {
             headerSeparator.bottomAnchor.constraint(equalTo: headerView.bottomAnchor),
             headerSeparator.heightAnchor.constraint(equalToConstant: 1),
         ])
-        
+
         let menuContainer = UIView()
-        
+
         menuContainer.translatesAutoresizingMaskIntoConstraints = false
         headerView.addSubview(menuContainer)
         if #available(iOS 11.0, *) {
@@ -400,24 +441,24 @@ private extension FMPhotoPickerViewController {
             menuContainer.bottomAnchor.constraint(equalTo: headerView.bottomAnchor),
             menuContainer.heightAnchor.constraint(equalToConstant: 44)
         ])
-        
+
         let cancelButton = UIButton(type: .system)
         self.cancelButton = cancelButton
         cancelButton.setTitleColor(kBlackColor, for: .normal)
         cancelButton.addTarget(self, action: #selector(onTapCancel(_:)), for: .touchUpInside)
-        
+
         cancelButton.translatesAutoresizingMaskIntoConstraints = false
         menuContainer.addSubview(cancelButton)
         NSLayoutConstraint.activate([
             cancelButton.leftAnchor.constraint(equalTo: menuContainer.leftAnchor, constant: 16),
             cancelButton.centerYAnchor.constraint(equalTo: menuContainer.centerYAnchor),
         ])
-        
+
         let doneButton = UIButton(type: .system)
         self.doneButton = doneButton
         doneButton.setTitleColor(kBlackColor, for: .normal)
         doneButton.addTarget(self, action: #selector(onTapDone(_:)), for: .touchUpInside)
-        
+
         doneButton.translatesAutoresizingMaskIntoConstraints = false
         menuContainer.addSubview(doneButton)
         NSLayoutConstraint.activate([
@@ -425,13 +466,13 @@ private extension FMPhotoPickerViewController {
             doneButton.centerYAnchor.constraint(equalTo: menuContainer.centerYAnchor),
             doneButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 40),
         ])
-        
+
         let numberOfSelectedPhotoContainer = UIView()
         self.numberOfSelectedPhotoContainer = numberOfSelectedPhotoContainer
         numberOfSelectedPhotoContainer.layer.cornerRadius = 14
         numberOfSelectedPhotoContainer.layer.masksToBounds = true
         numberOfSelectedPhotoContainer.backgroundColor = kRedColor
-        
+
         numberOfSelectedPhotoContainer.translatesAutoresizingMaskIntoConstraints = false
         menuContainer.addSubview(numberOfSelectedPhotoContainer)
         NSLayoutConstraint.activate([
@@ -440,13 +481,13 @@ private extension FMPhotoPickerViewController {
             numberOfSelectedPhotoContainer.heightAnchor.constraint(equalToConstant: 28),
             numberOfSelectedPhotoContainer.widthAnchor.constraint(equalToConstant: 28),
         ])
-        
+
         let numberOfSelectedPhoto = UILabel()
         self.numberOfSelectedPhoto = numberOfSelectedPhoto
         numberOfSelectedPhoto.font = .systemFont(ofSize: 15)
         numberOfSelectedPhoto.textColor = .white
         numberOfSelectedPhoto.textAlignment = .center
-        
+
         numberOfSelectedPhoto.translatesAutoresizingMaskIntoConstraints = false
         numberOfSelectedPhotoContainer.addSubview(numberOfSelectedPhoto)
         NSLayoutConstraint.activate([
@@ -455,11 +496,11 @@ private extension FMPhotoPickerViewController {
             numberOfSelectedPhoto.bottomAnchor.constraint(equalTo: numberOfSelectedPhotoContainer.bottomAnchor),
             numberOfSelectedPhoto.leftAnchor.constraint(equalTo: numberOfSelectedPhotoContainer.leftAnchor),
         ])
-        
+
         let imageCollectionView = UICollectionView(frame: .zero, collectionViewLayout: FMPhotoPickerImageCollectionViewLayout())
         self.imageCollectionView = imageCollectionView
         imageCollectionView.backgroundColor = .clear
-        
+
         imageCollectionView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(imageCollectionView)
         NSLayoutConstraint.activate([
