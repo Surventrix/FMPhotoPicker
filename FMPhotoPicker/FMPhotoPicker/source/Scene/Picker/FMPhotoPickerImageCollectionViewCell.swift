@@ -43,6 +43,7 @@ class FMPhotoPickerImageCollectionViewCell: UICollectionViewCell {
         let imageView = UIImageView()
         self.imageView = imageView
         imageView.contentMode = .scaleAspectFill
+        self.setPlaceHolder()
 
         contentView.addSubview(imageView)
         imageView.translatesAutoresizingMaskIntoConstraints = false
@@ -147,16 +148,23 @@ class FMPhotoPickerImageCollectionViewCell: UICollectionViewCell {
         ])
     }
 
+    func setPlaceHolder() {
+        if #available(iOS 13.0, *) {
+            self.imageView.image = UIImage(systemName: "photo")
+        } else {
+            self.imageView.image = nil
+        }
+    }
+
     override func prepareForReuse() {
         super.prepareForReuse()
-
-        self.imageView.image = nil
+        self.setPlaceHolder()
         self.videoInfoView.isHidden = true
-
         self.photoAsset?.cancelAllRequest()
     }
 
     func updateImage()  {
+        self.setPlaceHolder()
         self.photoAsset?.requestThumb() { image in
             if image == nil {
                 self.updateImage()
