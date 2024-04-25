@@ -18,7 +18,7 @@ public enum FMMediaType {
     case image
     case video
     case unsupported
-    
+
     public func value() -> Int {
         switch self {
         case .image:
@@ -29,7 +29,7 @@ public enum FMMediaType {
             return PHAssetMediaType.unknown.rawValue
         }
     }
-    
+
     init(withPHAssetMediaType type: PHAssetMediaType) {
         switch type {
         case .image:
@@ -54,29 +54,29 @@ public struct FMPhotoPickerConfig {
 
     /// Whether you want FMPhotoPicker returns PHAsset instead of UIImage.
     public var shouldReturnAsset: Bool = false
-    
+
     public var forceCropEnabled = false
     public var eclipsePreviewEnabled = false
-    
+
     public var titleFontSize: CGFloat = 17
-    
+
     public var strings: [String: String] = [
             "picker_button_cancel":                     "Cancel",
             "picker_button_select_done":                "Done",
             "picker_warning_over_image_select_format":  "You can select maximum %d images",
             "picker_warning_over_video_select_format":  "You can select maximum %d videos",
-            
+
             "present_title_photo_created_date_format":  "yyyy/M/d",
             "present_button_back":                      "Back",
             "present_button_edit_image":                "Edit",
-            
+
             "editor_button_cancel":                     "Cancel",
             "editor_button_done":                       "Done",
             "editor_menu_filter":                       "Filter",
             "editor_menu_crop":                         "Crop",
             "editor_menu_crop_button_reset":            "Reset",
             "editor_menu_crop_button_rotate":           "Rotate",
-            
+
             "editor_crop_ratio4x3":                     "4:3",
             "editor_crop_ratio16x9":                    "16:9",
             "editor_crop_ratio9x16":                    "9x16",
@@ -87,11 +87,12 @@ public struct FMPhotoPickerConfig {
             "permission_dialog_title":                  "Surventrix",
             "permission_dialog_message":                "Surventrix wants to access Photo Library",
             "permission_button_ok":                     "OK",
-            "permission_button_cancel":                 "Cancel"
+            "permission_button_cancel":                 "Cancel",
+            "picker_data_not_found":                    "Data not found"
         ]
 
-    
+
     public init() {
-        
+
     }
 }
