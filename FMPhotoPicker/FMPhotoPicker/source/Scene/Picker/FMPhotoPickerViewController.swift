@@ -37,6 +37,7 @@ public class FMPhotoPickerViewController: UIViewController {
     // Track this to calculate the destination frame for dismissal animation
     // from PhotoPresenterViewController to this ViewController
     private var presentedPhotoIndex: Int?
+    private var sourceTypes: PHAssetSourceType = [PHAssetSourceType.typeUserLibrary]
 
     private let config: FMPhotoPickerConfig
 
@@ -137,7 +138,7 @@ public class FMPhotoPickerViewController: UIViewController {
     }
 
     private func fetchPhotos() {
-        let photoAssets = Helper.getAssets(allowMediaTypes: self.config.mediaTypes)
+        let photoAssets = Helper.getAssets(allowMediaTypes: self.config.mediaTypes, includeAssetSourceTypes: self.sourceTypes)
         var forceCropType: FMCroppable? = nil
         if config.forceCropEnabled, let firstCrop = config.availableCrops?.first {
             forceCropType = firstCrop
@@ -145,11 +146,23 @@ public class FMPhotoPickerViewController: UIViewController {
         let fmPhotoAssets = photoAssets.map { FMPhotoAsset(asset: $0, forceCropType: forceCropType) }
         self.dataSource = FMPhotosDataSource(photoAssets: fmPhotoAssets)
 
-        if self.dataSource.numberOfPhotos > 0 {
+        DispatchQueue.main.async {
             self.imageCollectionView.reloadData()
-            self.imageCollectionView.selectItem(at: IndexPath(row: self.dataSource.numberOfPhotos - 1, section: 0),
-                                                animated: false,
-                                                scrollPosition: .bottom)
+            self.updateControlBar()
+            if self.dataSource.numberOfPhotos > 0 {
+                self.imageCollectionView.backgroundView = nil
+                self.imageCollectionView.selectItem(at: IndexPath(row: self.dataSource.numberOfPhotos - 1, section: 0),
+                                                    animated: false,
+                                                    scrollPosition: .bottom)
+            } else {
+                let label = UILabel()
+                label.font = .systemFont(ofSize: 14)
+                label.text = self.config.strings["picker_data_not_found"]
+                label.textAlignment = .center
+                label.sizeToFit()
+                label.frame = self.imageCollectionView.bounds
+                self.imageCollectionView.backgroundView = label
+            }
         }
     }
 
@@ -442,6 +455,7 @@ private extension FMPhotoPickerViewController {
             menuContainer.heightAnchor.constraint(equalToConstant: 44)
         ])
 
+
         let cancelButton = UIButton(type: .system)
         self.cancelButton = cancelButton
         cancelButton.setTitleColor(kBlackColor, for: .normal)
@@ -478,8 +492,8 @@ private extension FMPhotoPickerViewController {
         NSLayoutConstraint.activate([
             numberOfSelectedPhotoContainer.rightAnchor.constraint(equalTo: doneButton.leftAnchor, constant: -16),
             numberOfSelectedPhotoContainer.centerYAnchor.constraint(equalTo: menuContainer.centerYAnchor),
-            numberOfSelectedPhotoContainer.heightAnchor.constraint(equalToConstant: 28),
-            numberOfSelectedPhotoContainer.widthAnchor.constraint(equalToConstant: 28),
+            numberOfSelectedPhotoContainer.heightAnchor.constraint(equalToConstant: 30),
+            numberOfSelectedPhotoContainer.widthAnchor.constraint(equalToConstant: 30),
         ])
 
         let numberOfSelectedPhoto = UILabel()
@@ -497,6 +511,19 @@ private extension FMPhotoPickerViewController {
             numberOfSelectedPhoto.leftAnchor.constraint(equalTo: numberOfSelectedPhotoContainer.leftAnchor),
         ])
 
+        // Initialize
+        let items = ["Library", "iCloud Shared"]
+        let segmentedControl = UISegmentedControl(items: items)
+        segmentedControl.selectedSegmentIndex = 0
+        segmentedControl.isUserInteractionEnabled = true
+        segmentedControl.addTarget(self, action: #selector(self.segmentedControlChanged(_:)), for: .valueChanged)
+        segmentedControl.translatesAutoresizingMaskIntoConstraints = false
+        menuContainer.addSubview(segmentedControl)
+        NSLayoutConstraint.activate([
+            segmentedControl.centerXAnchor.constraint(equalTo: menuContainer.centerXAnchor),
+            segmentedControl.centerYAnchor.constraint(equalTo: menuContainer.centerYAnchor),
+        ])
+
         let imageCollectionView = UICollectionView(frame: .zero, collectionViewLayout: FMPhotoPickerImageCollectionViewLayout())
         self.imageCollectionView = imageCollectionView
         imageCollectionView.backgroundColor = .clear
@@ -504,10 +531,16 @@ private extension FMPhotoPickerViewController {
         imageCollectionView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(imageCollectionView)
         NSLayoutConstraint.activate([
-            imageCollectionView.topAnchor.constraint(equalTo: menuContainer.bottomAnchor),
+            imageCollectionView.topAnchor.constraint(equalTo: headerView.bottomAnchor),
             imageCollectionView.rightAnchor.constraint(equalTo: view.rightAnchor),
             imageCollectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             imageCollectionView.leftAnchor.constraint(equalTo: view.leftAnchor),
         ])
     }
+
+    @objc func segmentedControlChanged(_ sender: UISegmentedControl) {
+        self.sourceTypes = sender.selectedSegmentIndex == 0 ? [.typeUserLibrary] : [.typeCloudShared]
+        self.requestAndFetchAssets()
+    }
 }
+
