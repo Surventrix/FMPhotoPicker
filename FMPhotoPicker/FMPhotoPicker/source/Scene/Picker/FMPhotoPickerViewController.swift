@@ -514,6 +514,14 @@ private extension FMPhotoPickerViewController {
         // Initialize
         let items = ["Library", "iCloud Shared"]
         let segmentedControl = UISegmentedControl(items: items)
+        segmentedControl.backgroundColor = UIColor.white
+        segmentedControl.setTitleTextAttributes([.foregroundColor: UIColor.black], for: .normal)
+        segmentedControl.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .selected)
+        if #available(iOS 13.0, *) {
+            segmentedControl.selectedSegmentTintColor = UIColor(red: 163.0/255.0, green: 211.0/255.0, blue: 39.0/255.0, alpha: 1)
+        } else {
+            // Fallback on earlier versions
+        }
         segmentedControl.selectedSegmentIndex = 0
         segmentedControl.isUserInteractionEnabled = true
         segmentedControl.addTarget(self, action: #selector(self.segmentedControlChanged(_:)), for: .valueChanged)
@@ -543,4 +551,3 @@ private extension FMPhotoPickerViewController {
         self.requestAndFetchAssets()
     }
 }
-
